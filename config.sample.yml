@@ -1,0 +1,5 @@
+server:
+  url: "https://matrix.org"
+  user: ark
+  password: botpassword
+  prefix: ark
