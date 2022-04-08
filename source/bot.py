@@ -71,7 +71,7 @@ async def check_server(server):
                     else:
                         await asyncio.sleep(0.3)
         except BaseException as e:
-            if 'Connection refused' in str(e): pass
+            if 'Connection' in str(e): pass
             else:
                 await bot.api.send_text_message(server['room'],str(e))
         await asyncio.sleep(5)
