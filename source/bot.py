@@ -64,7 +64,7 @@ async def check_server(server):
                         res = res[res.find(':')+1:].rstrip()
                         if 'SERVER:' in res:
                             res = res[res.find(':')+1:]
-                        if not lastsend in res:
+                        if not lastsend or (not (lastsend in res)):
                             await bot.api.send_text_message(server['room'],res)
                         else:
                             lastsend = None
