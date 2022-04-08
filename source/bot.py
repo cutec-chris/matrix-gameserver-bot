@@ -7,13 +7,14 @@ lastsend = None
 async def listen(room, message):
     global servers
     match = botlib.MessageMatch(room, message, bot, prefix)
-    if match.is_not_from_this_bot() and match.prefix()\
-    and match.command("cmd"):
+    if match.is_not_from_this_bot() and match.prefix():
         for server in servers:
             if server['room'] == room.room_id:
                 break
         if server['room'] != room.room_id: return
-        ncmd = " ".join(arg for arg in match.args()[1:])
+        ncmd = " ".join(arg for arg in match.args())
+        if not ('admins' in server and message.sender in server['admins']):
+            await bot.api.send_text_message(room.room_id, 'not authorized')
         try:
             res = server['_client'].run(ncmd)
             if not 'Server received, But no response!!' in res:
