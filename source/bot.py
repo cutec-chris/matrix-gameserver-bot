@@ -1,7 +1,8 @@
+from lib2to3.pytree import Base
 from init import *
-import rcon
+import rcon,a2s
 servers = []
-
+loop = None
 @bot.listener.on_message_event
 async def listen(room, message):
     match = botlib.MessageMatch(room, message, bot, prefix)
@@ -10,13 +11,15 @@ async def listen(room, message):
         server = {
             'room': room.room_id,
             'server': match.args()[1],
-            'port': match.args()[2],
-            'password': match.args()[3],
+            'qport': match.args()[2],
+            'rcon': match.args()[3],
+            'password': match.args()[4],
         }
         servers.append(server)
+        loop.create_task(check_server(server))
         with open('data.json', 'w') as f:
             json.dump(servers,f)
-        await bot.api.send_text_message(room.room_id, 'server added')
+        await bot.api.send_text_message(room.room_id, 'ok')
 @bot.listener.on_message_event
 async def bot_help(room, message):
     bot_help_message = f"""
@@ -24,7 +27,7 @@ async def bot_help(room, message):
         prefix: {prefix}
         commands:
             listen:
-                command: listen server port password
+                command: listen server query_port rcon_port password
                 description: add ark server
             help:
                 command: help, ?, h
@@ -36,36 +39,41 @@ async def bot_help(room, message):
     or match.command("?") 
     or match.command("h")):
         await bot.api.send_text_message(room.room_id, bot_help_message)
-async def check_server(server,room):
+async def check_server(server):
     while True:
-        with rcon.source.Client(server['server'], int(server['port']), passwd=server['password']) as client:
-            room.arkclient = None
-            def tell(*args):
-                res = client.run(*args)
-                #print(*args)
-                if not 'Server received, But no response!!' in res:
-                    return res
-                return None
-            def ShowGameLog(room):
-                res = tell('GetGameLog')
-                if res:
-                    room.send_text(res)
-                    print(res)
-                    res = res.split('\n')
-            room.send_text('Server '+map+' is up now...')
-            room.arkclient = client
-            room.docker = docker
-            room.add_listener(on_message)
-            ConnectionDone = True
-            while True:
-                ShowGameLog(room)
+        try:
+            with rcon.source.Client(server['server'], int(server['rcon']), passwd=server['password']) as client:
+                def tell(*args):
+                    res = client.run(*args)
+                    #print(*args)
+                    if not 'Server received, But no response!!' in res:
+                        return res
+                    return None
+                try:
+                    info = a2s.info((server['server'], int(server['qport'])))
+                    answer = 'Server %s is up with %s ...\nMap: %s\nPlayers: %d of %d' % (info.server_name,info.game,info.map_name,info.player_count,info.max_players)
+                except BaseException as e:
+                    info = None
+                    answer = 'Server is up now...'
+                await bot.api.send_text_message(server['room'],answer)
+                while True:
+                    res = tell('GetGameLog')
+                    if res:
+                        await bot.api.send_text_message(server['room'],res)
+                    else:
+                        await asyncio.sleep(0.3)
+        except BaseException as e:
+            await bot.api.send_text_message(server['room'],str(e))
+        await asyncio.sleep(5)
 @bot.listener.on_startup
-def startup(server):
+async def startup(room):
+    global loop,servers
+    loop = asyncio.get_running_loop()
     try:
         with open('data.json', 'r') as f:
             servers = json.load(f)
     except: pass
-    loop = asyncio.get_event_loop()
     for server in servers:
-        loop.create_task(check_server(server,''))
+        if server['room'] == room:
+            loop.create_task(check_server(server))
 bot.run()
