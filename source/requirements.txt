@@ -1,4 +1,4 @@
 simplematrixbotlib
-yaml
+yaml2
 python-a2s
 rcon
