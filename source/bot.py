@@ -40,11 +40,13 @@ async def listen(room, message):
         except:
             pass
 async def check_server(server):
-    global lastsend
+    global lastsend,servers
     while True:
         try:
             with rcon.source.Client(server['server'], int(server['rcon']), passwd=server['password']) as client:
-                server['_client'] = client
+                for server_r in servers:
+                    if server_r['room'] == server['room']:
+                        server_r['_client'] = client
                 def tell(*args):
                     res = client.run(*args)
                     #print(*args)
