@@ -36,6 +36,7 @@ async def listen(room, message):
             if user[:1] == '@':
                 user = user[1:]
             server['_client'].run('ServerChat',user+':'+message.body)
+            server['_client'].run('amx_say',user+':'+message.body)
             lastsend = user+':'+message.body
         except:
             pass

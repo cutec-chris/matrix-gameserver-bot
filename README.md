@@ -20,3 +20,9 @@ Messages in the channel are shown as global chat if supported.
 ## tested Games
 
 * ARK Survival Evolved
+
+### untested
+* CS:GO
+* Minecraft
+* [Conan Exiles](https://store.steampowered.com/app/440900/Conan_Exiles/)
+* Reign Of Kings
