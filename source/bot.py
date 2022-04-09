@@ -4,12 +4,29 @@ servers = []
 loop = None
 lastsend = None
 @bot.listener.on_message_event
-async def listen(room, message):
-    global servers
+async def tell(room, message):
+    global servers,lastsend
     match = botlib.MessageMatch(room, message, bot, prefix)
-    if match.is_not_from_this_bot() and match.prefix():
+    if match.is_not_from_this_bot() and match.prefix()\
+    and match.command("listen"):
+        server = {
+            'room': room.room_id,
+            'server': match.args()[1],
+            'rcon': match.args()[2],
+            'password': None
+        }
+        if len(match.args())>3:
+            server['password'] = match.args()[3]
+        if len(match.args())>4:
+            server['qport'] = match.args()[4]
+        servers.append(server)
+        loop.create_task(check_server(server))
+        with open('data.json', 'w') as f:
+            json.dump(servers,f, skipkeys=True)
+        await bot.api.send_text_message(room.room_id, 'ok')
+    elif match.is_not_from_this_bot() and match.prefix():
         for server in servers:
-            if server['room'] == room.room_id:
+            if server['room'] == room.room_id and '_client' in server:
                 break
         if server['room'] != room.room_id: return
         ncmd = " ".join(arg for arg in match.args())
@@ -21,13 +38,9 @@ async def listen(room, message):
                 await bot.api.send_text_message(room.room_id, res)
         except BaseException as e:
             await bot.api.send_text_message(room.room_id, str(e))
-@bot.listener.on_message_event
-async def listen(room, message):
-    global servers,lastsend
-    match = botlib.MessageMatch(room, message, bot, prefix)
-    if match.is_not_from_this_bot():
+    elif match.is_not_from_this_bot():
         for server in servers:
-            if server['room'] == room.room_id:
+            if server['room'] == room.room_id and '_client' in server:
                 break
         if server['room'] != room.room_id: return
         try:
@@ -42,12 +55,15 @@ async def listen(room, message):
             pass
 async def check_server(server):
     global lastsend,servers
+    def update_server_var():
+        for server_r in servers:
+            if server_r['room'] == server['room']:
+                server_r = server
     while True:
         try:
             with rcon.source.Client(server['server'], int(server['rcon']), passwd=server['password']) as client:
-                for server_r in servers:
-                    if server_r['room'] == server['room']:
-                        server_r['_client'] = client
+                server['_client'] = client
+                update_server_var()
                 def tell(*args):
                     res = client.run(*args)
                     #print(*args)
@@ -62,8 +78,13 @@ async def check_server(server):
                     answer = 'Server is up now...'
                 await bot.api.send_text_message(server['room'],answer)
                 while True:
-                    res = tell('GetGameLog')
+                    res = None
+                    if 'gamelog' in server and server['gamelog']:
+                        res = tell('GetGameLog')
                     if res:
+                        if 'error' in res:
+                            server['gamelog'] = False
+                            update_server_var()
                         res = res[res.find(':')+1:].rstrip()
                         if 'SERVER:' in res:
                             res = res[res.find(':')+1:]
@@ -89,26 +110,6 @@ async def startup(room):
     for server in servers:
         if server['room'] == room:
             loop.create_task(check_server(server))
-@bot.listener.on_message_event
-async def listen(room, message):
-    match = botlib.MessageMatch(room, message, bot, prefix)
-    if match.is_not_from_this_bot() and match.prefix()\
-    and match.command("listen"):
-        server = {
-            'room': room.room_id,
-            'server': match.args()[1],
-            'rcon': match.args()[2],
-            'password': None
-        }
-        if len(match.args())>3:
-            server['password'] = match.args()[3]
-        if len(match.args())>4:
-            server['qport'] = match.args()[4]
-        servers.append(server)
-        loop.create_task(check_server(server))
-        with open('data.json', 'w') as f:
-            json.dump(servers,f, skipkeys=True)
-        await bot.api.send_text_message(room.room_id, 'ok')
 @bot.listener.on_message_event
 async def bot_help(room, message):
     bot_help_message = f"""
