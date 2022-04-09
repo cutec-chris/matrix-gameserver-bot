@@ -96,10 +96,13 @@ async def listen(room, message):
         server = {
             'room': room.room_id,
             'server': match.args()[1],
-            'qport': match.args()[2],
-            'rcon': match.args()[3],
-            'password': match.args()[4],
+            'rcon': match.args()[2],
+            'password': None
         }
+        if len(match.args())>3:
+            server['password'] = match.args()[3]
+        if len(match.args())>4:
+            server['qport'] = match.args()[4]
         servers.append(server)
         loop.create_task(check_server(server))
         with open('data.json', 'w') as f:
@@ -111,8 +114,12 @@ async def bot_help(room, message):
     Help Message:
         prefix: {prefix}
         commands:
+            speaking to bot:
+                is used as rcon console command when you are in the admins list
+            speaking in channel:
+                is send as server global chat message if supported
             listen:
-                command: listen server query_port rcon_port password
+                command: listen server rcon_port [password] [Query Port]
                 description: add ark server
             help:
                 command: help, ?, h
