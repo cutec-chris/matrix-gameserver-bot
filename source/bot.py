@@ -57,7 +57,6 @@ async def tell(room, message):
             pass
 async def check_server(server):
     global lastsend,servers
-    lasterror = None
     while True:
         try:
             with rcon.source.Client(server.server, int(server.rcon), passwd=server.password) as client:
@@ -77,14 +76,14 @@ async def check_server(server):
                     answer = 'Server is up now...'
                 await bot.api.send_text_message(server.room,answer)
                 res = tell('GetGameLog')
-                if not 'error' in res:
+                if not 'error' in str(res):
                     server.gamelog = True
                 while True:
                     res = None
                     if hasattr(server,'gamelog') and server.gamelog:
                         res = tell('GetGameLog')
                     if res:
-                        if 'error' in res:
+                        if 'error' in str(res):
                             server.gamelog = False
                             #update_server_var()
                         res = res[res.find(':')+1:].rstrip()
@@ -97,10 +96,9 @@ async def check_server(server):
                     else:
                         await asyncio.sleep(0.3)
         except BaseException as e:
-            if 'Connection' in str(e): pass
-            elif lasterror != str(e):
-                await bot.api.send_text_message(server.room,str(e))
-                lasterror = str(e)
+            if not hasattr(server,'lasterror') or server.lasterror != str(e):
+                await bot.api.send_text_message(server.room,str(server.server)+': '+str(e))
+                server.lasterror = str(e)
         await asyncio.sleep(5)
 try:
     with open('data.json', 'r') as f:
