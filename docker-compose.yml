@@ -1,0 +1,7 @@
+version: "2"
+services:
+  arkbot:
+    build: .
+    restart: always
+    volumes:
+      - ./data:/data
