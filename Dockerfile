@@ -1,4 +1,4 @@
-from python:3.8.0
+from python:3.11-alpine
 RUN mkdir /bot
 RUN mkdir /bot/source
 RUN mkdir /data

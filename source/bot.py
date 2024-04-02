@@ -11,26 +11,25 @@ async def tell(room, message):
     match = botlib.MessageMatch(room, message, bot, prefix)
     if match.is_not_from_this_bot() and match.prefix()\
     and match.command("listen"):
-        server = Server({
-            'room': room.room_id,
-            'server': match.args()[1],
-            'rcon': match.args()[2],
-            'password': None
-        })
+        server = Server(room=room.room_id,
+            server=match.args()[1],
+            rcon=match.args()[2],
+            password=None
+        )
         if len(match.args())>3:
             server.password = match.args()[3]
         if len(match.args())>4:
             server.qport = match.args()[4]
         servers.append(server)
         loop.create_task(check_server(server))
-        with open('data.json', 'w') as f:
-            json.dump(servers,f, skipkeys=True)
+        await save_servers()
         await bot.api.send_text_message(room.room_id, 'ok')
     elif match.is_not_from_this_bot() and match.prefix():
+        server = None
         for server in servers:
             if server.room == room.room_id and '_client' in server:
                 break
-        if server.room != room.room_id: return
+        if not server or server.room != room.room_id: return
         ncmd = " ".join(arg for arg in match.args())
         if not ('admins' in server and message.sender in server.admins):
             await bot.api.send_text_message(room.room_id, 'not authorized')
@@ -41,10 +40,11 @@ async def tell(room, message):
         except BaseException as e:
             await bot.api.send_text_message(room.room_id, str(e))
     elif match.is_not_from_this_bot():
+        server = None
         for server in servers:
             if server.room == room.room_id and '_client' in server:
                 break
-        if server.room != room.room_id: return
+        if not server or server.room != room.room_id: return
         try:
             user = message.sender
             user = user[:user.find(':')]
@@ -96,9 +96,12 @@ async def check_server(server):
                     else:
                         await asyncio.sleep(0.3)
         except BaseException as e:
-            if not hasattr(server,'lasterror') or server.lasterror != str(e):
-                await bot.api.send_text_message(server.room,str(server.server)+': '+str(e))
-                server.lasterror = str(e)
+            err = str(e)
+            if err == '':
+                err = e.__doc__
+            if not hasattr(server,'lasterror') or server.lasterror != err:
+                await bot.api.send_text_message(server.room,str(server.server)+': '+err)
+                server.lasterror = err
         await asyncio.sleep(5)
 try:
     with open('data.json', 'r') as f:
@@ -106,8 +109,7 @@ try:
         for server in nservers:
             servers.append(Server(server))
 except BaseException as e: 
-    logging.error('Failed to read config.yml:'+str(e))
-    exit(1)
+    logging.error('Failed to read data.json:'+str(e))
 @bot.listener.on_startup
 async def startup(room):
     global loop,servers
@@ -133,7 +135,7 @@ async def bot_help(room, message):
                 description: display help command
                 """
     match = botlib.MessageMatch(room, message, bot, prefix)
-    if match.is_not_from_this_bot() and match.prefix() and (
+    if match.is_not_from_this_bot() and (
        match.command("help") 
     or match.command("?") 
     or match.command("h")):
