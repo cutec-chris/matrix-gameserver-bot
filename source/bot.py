@@ -110,13 +110,16 @@ try:
             servers.append(Server(server))
 except BaseException as e: 
     logging.error('Failed to read data.json:'+str(e))
+tasks = []
 @bot.listener.on_startup
 async def startup(room):
-    global loop,servers
+    global loop,servers,tasks
     loop = asyncio.get_running_loop()
     for server in servers:
         if server.room == room:
-            loop.create_task(check_server(server))
+            task = check_server(server)
+            tasks.append(task)
+            loop.create_task(task)
 @bot.listener.on_message_event
 async def bot_help(room, message):
     bot_help_message = f"""
@@ -140,4 +143,33 @@ async def bot_help(room, message):
     or match.command("?") 
     or match.command("h")):
         await bot.api.send_text_message(room.room_id, bot_help_message)
-bot.run()
+async def status_handler(request):
+    global tasks
+    try:
+        failed_task = [task for task in tasks if task.done()]
+    except:
+        failed_task = True
+    if failed_task:
+        os._exit(2)
+    else:
+        return aiohttp.web.Response(text="OK")
+async def main():
+    try:
+        def unhandled_exception(loop, context):
+            msg = context.get("exception", context["message"])
+            logger.error(f"Unhandled exception caught: {msg}")
+            loop.default_exception_handler(context)
+            os._exit(1)
+        loop = asyncio.get_event_loop()
+        loop.set_exception_handler(unhandled_exception)
+        app = aiohttp.web.Application()
+        app.add_routes([aiohttp.web.get('/status', status_handler)])
+        runner = aiohttp.web.AppRunner(app, access_log=None)
+        await runner.setup()
+        site = aiohttp.web.TCPSite(runner,port=9998)    
+        await site.start()
+        await bot.main()
+    except BaseException as e:
+        logger.error('bot main fails:'+str(e),stack_info=True)
+        os._exit(1)
+asyncio.run(main())
